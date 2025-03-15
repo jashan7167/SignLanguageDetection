@@ -1,0 +1,480 @@
+# Importing Libraries
+import numpy as np
+import math
+import cv2
+import os, sys
+import traceback
+import pyttsx3
+from keras.models import load_model
+from cvzone.HandTrackingModule import HandDetector
+from string import ascii_uppercase
+import enchant
+ddd=enchant.Dict("en-US")
+hd = HandDetector(maxHands=1)
+hd2 = HandDetector(maxHands=1)
+import tkinter as tk
+from PIL import Image, ImageTk
+offset=29
+
+class Application:
+
+    def __init__(self):
+        self.vs = cv2.VideoCapture(2)
+        self.current_image = None
+        self.model = load_model('Sign-Language-To-Text-and-Speech-Conversion/cnn8grps_rad1_model.h5')
+        self.speak_engine=pyttsx3.init()
+        self.speak_engine.setProperty("rate",100)
+        voices=self.speak_engine.getProperty("voices")
+        self.speak_engine.setProperty("voice",voices[0].id)
+
+        self.ct = {}
+        self.ct['blank'] = 0
+        self.blank_flag = 0
+        self.space_flag=False
+        self.next_flag=True
+        self.prev_char=""
+        self.count=-1
+        self.ten_prev_char=[]
+        for i in range(10):
+            self.ten_prev_char.append(" ")
+
+
+        for i in ascii_uppercase:
+            self.ct[i] = 0
+        print("Loaded model from disk")
+
+
+        self.root = tk.Tk()
+        self.root.title("Sign Language To Text Conversion")
+        self.root.protocol('WM_DELETE_WINDOW', self.destructor)
+        self.root.geometry("1300x700")
+
+        self.panel = tk.Label(self.root)
+        self.panel.place(x=100, y=3, width=480, height=640)
+
+        self.panel2 = tk.Label(self.root)  # initialize image panel
+        self.panel2.place(x=700, y=115, width=400, height=400)
+
+        self.T = tk.Label(self.root)
+        self.T.place(x=60, y=5)
+        self.T.config(text="Sign Language To Text Conversion", font=("Courier", 30, "bold"))
+
+        self.panel3 = tk.Label(self.root)  # Current Symbol
+        self.panel3.place(x=280, y=585)
+
+        self.T1 = tk.Label(self.root)
+        self.T1.place(x=10, y=580)
+        self.T1.config(text="Character :", font=("Courier", 30, "bold"))
+
+        self.panel5 = tk.Label(self.root)  # Sentence
+        self.panel5.place(x=260, y=632)
+
+        self.T3 = tk.Label(self.root)
+        self.T3.place(x=10, y=632)
+        self.T3.config(text="Sentence :", font=("Courier", 30, "bold"))
+
+        self.T4 = tk.Label(self.root)
+        self.T4.place(x=10, y=700)
+        self.T4.config(text="Suggestions :", fg="red", font=("Courier", 30, "bold"))
+
+
+        self.b1=tk.Button(self.root)
+        self.b1.place(x=390,y=700)
+
+        self.b2 = tk.Button(self.root)
+        self.b2.place(x=590, y=700)
+
+        self.b3 = tk.Button(self.root)
+        self.b3.place(x=790, y=700)
+
+        self.b4 = tk.Button(self.root)
+        self.b4.place(x=990, y=700)
+
+        self.speak = tk.Button(self.root)
+        self.speak.place(x=1305, y=630)
+        self.speak.config(text="Speak", font=("Courier", 20), wraplength=100, command=self.speak_fun)
+
+        self.clear = tk.Button(self.root)
+        self.clear.place(x=1205, y=630)
+        self.clear.config(text="Clear", font=("Courier", 20), wraplength=100, command=self.clear_fun)
+
+
+        self.str = " "
+        self.ccc=0
+        self.word = " "
+        self.current_symbol = "C"
+        self.photo = "Empty"
+
+
+        self.word1=" "
+        self.word2 = " "
+        self.word3 = " "
+        self.word4 = " "
+
+        self.video_loop()
+
+    def destructor(self):
+        """
+        Clean up resources and close the application.
+        """
+        print(self.ten_prev_char)
+        self.root.destroy()
+        self.vs.release()
+        cv2.destroyAllWindows()
+
+    def video_loop(self):
+        try:
+            #video capture and preprocessing
+            ok, frame = self.vs.read()
+            #captures a frame from the webcam and horizontally flips it for a mirror like effect
+            cv2image = cv2.flip(frame, 1)
+            #check frame is valid use hand tracking module to detect hands in the frame converts the frame to RGB for displaying in the Tkinter GUI
+            if cv2image.any:
+                hands = hd.findHands(cv2image, draw=False, flipType=True)
+                cv2image_copy=np.array(cv2image)
+                #converts the processed frame into a format compatible with tkinter
+                cv2image = cv2.cvtColor(cv2image, cv2.COLOR_BGR2RGB)
+                #updates the gui video display with the current frame
+                self.current_image = Image.fromarray(cv2image)
+                imgtk = ImageTk.PhotoImage(image=self.current_image)
+                self.panel.imgtk = imgtk
+                self.panel.config(image=imgtk)
+                #if hand is detected 
+                if hands[0]:
+                    hand = hands[0]
+                    map = hand[0]
+                    #extract bounding box around the hand
+                    x, y, w, h=map['bbox']
+                    #crops hand region with a margin(offset) important for isolating the hand and improving model perf
+                    image = cv2image_copy[y - offset:y + h + offset, x - offset:x + w + offset]
+
+                    #load white background for handlandmarks
+                    white = cv2.imread("Sign-Language-To-Text-and-Speech-Conversion/white.jpg")
+                    # img_final=img_final1=img_final2=0
+                    if image.all:
+                        handz = hd2.findHands(image, draw=False, flipType=True)
+                        self.ccc += 1
+                        if handz[0]:
+                            hand = handz[0]
+                            handmap=hand[0]
+                            #detect landmarks of the cropped hand image
+                            self.pts = handmap['lmList']
+                            # x1,y1,w1,h1=hand['bbox']
+                            
+                            #offsets for the proper placement on the white image
+                            os = ((400 - w) // 2) - 15
+                            os1 = ((400 - h) // 2) - 15
+                            #draw lines connecting hand landmarks on the white image
+                            for t in range(0, 4, 1):
+                                #connect landmarks from the self.pts having landmarks 0 to 4 represents the thumb
+                                cv2.line(white, (self.pts[t][0] + os, self.pts[t][1] + os1), (self.pts[t + 1][0] + os, self.pts[t + 1][1] + os1),
+                                         (0, 255, 0), 3)
+                            #index fingers
+                            for t in range(5, 8, 1):
+                                cv2.line(white, (self.pts[t][0] + os, self.pts[t][1] + os1), (self.pts[t + 1][0] + os, self.pts[t + 1][1] + os1),
+                                         (0, 255, 0), 3)
+                            #middle finger
+                            for t in range(9, 12, 1):
+                                cv2.line(white, (self.pts[t][0] + os, self.pts[t][1] + os1), (self.pts[t + 1][0] + os, self.pts[t + 1][1] + os1),
+                                         (0, 255, 0), 3)
+                            #ring finger
+                            for t in range(13, 16, 1):
+                                cv2.line(white, (self.pts[t][0] + os, self.pts[t][1] + os1), (self.pts[t + 1][0] + os, self.pts[t + 1][1] + os1),
+                                         (0, 255, 0), 3)
+                            #pinky finger
+                            for t in range(17, 20, 1):
+                                cv2.line(white, (self.pts[t][0] + os, self.pts[t][1] + os1), (self.pts[t + 1][0] + os, self.pts[t + 1][1] + os1),
+                                         (0, 255, 0), 3)
+                            
+                            #connect the palm from base landmarks (0,5,9,13,17)
+                            cv2.line(white, (self.pts[5][0] + os, self.pts[5][1] + os1), (self.pts[9][0] + os, self.pts[9][1] + os1), (0, 255, 0),
+                                     3)
+                            cv2.line(white, (self.pts[9][0] + os, self.pts[9][1] + os1), (self.pts[13][0] + os, self.pts[13][1] + os1), (0, 255, 0),
+                                     3)
+                            cv2.line(white, (self.pts[13][0] + os, self.pts[13][1] + os1), (self.pts[17][0] + os, self.pts[17][1] + os1),
+                                     (0, 255, 0), 3)
+                            cv2.line(white, (self.pts[0][0] + os, self.pts[0][1] + os1), (self.pts[5][0] + os, self.pts[5][1] + os1), (0, 255, 0),
+                                     3)
+                            cv2.line(white, (self.pts[0][0] + os, self.pts[0][1] + os1), (self.pts[17][0] + os, self.pts[17][1] + os1), (0, 255, 0),
+                                     3)
+                            #circles on landmarks
+                            for i in range(21):
+                                cv2.circle(white, (self.pts[i][0] + os, self.pts[i][1] + os1), 2, (0, 0, 255), 1)
+                            #the processed hand image the green landmarks on the white background is passed onto the method for gesture recognition
+                            res=white
+                            self.predict(res)
+
+
+                            #display the processed hand image with landmarks in another panel
+                            self.current_image2 = Image.fromarray(res)
+                            imgtk = ImageTk.PhotoImage(image=self.current_image2)
+                            self.panel2.imgtk = imgtk
+                            self.panel2.config(image=imgtk)
+                            #self.panel4.config(text=self.word, font=("Courier", 30))
+
+
+                            #update the gui with the current detected symbol
+                            self.panel3.config(text=self.current_symbol, font=("Courier", 30))
+
+
+
+                            self.b1.config(text=self.word1, font=("Courier", 20), wraplength=825, command=self.action1)
+                            self.b2.config(text=self.word2, font=("Courier", 20), wraplength=825,  command=self.action2)
+                            self.b3.config(text=self.word3, font=("Courier", 20), wraplength=825,  command=self.action3)
+                            self.b4.config(text=self.word4, font=("Courier", 20), wraplength=825,  command=self.action4)
+
+                self.panel5.config(text=self.str, font=("Courier", 30), wraplength=1025)
+        except Exception:
+            print("==", traceback.format_exc())
+        finally:
+            self.root.after(1, self.video_loop)
+
+
+#calculates the euclidean distance between two points x and y for analyzing hand geometry
+    def distance(self,x,y):
+        return math.sqrt(((x[0] - y[0]) ** 2) + ((x[1] - y[1]) ** 2))
+
+
+    #modify the senteces displayed on the Gui based on the user interaction using enchant we are detecting suggested words
+    def action1(self):
+        #finds the last word and replace it with the first suggested word
+        idx_space = self.str.rfind(" ")
+        idx_word = self.str.find(self.word, idx_space)
+        last_idx = len(self.str)
+        self.str = self.str[:idx_word]
+        self.str = self.str + self.word1.upper()
+
+
+    def action2(self):
+        idx_space = self.str.rfind(" ")
+        idx_word = self.str.find(self.word, idx_space)
+        last_idx = len(self.str)
+        self.str=self.str[:idx_word]
+        self.str=self.str+self.word2.upper()
+        #self.str[idx_word:last_idx] = self.word2
+
+
+    def action3(self):
+        idx_space = self.str.rfind(" ")
+        idx_word = self.str.find(self.word, idx_space)
+        last_idx = len(self.str)
+        self.str = self.str[:idx_word]
+        self.str = self.str + self.word3.upper()
+
+
+
+    def action4(self):
+        idx_space = self.str.rfind(" ")
+        idx_word = self.str.find(self.word, idx_space)
+        last_idx = len(self.str)
+        self.str = self.str[:idx_word]
+        self.str = self.str + self.word4.upper()
+
+    #converts the current sentence(self.str) into the speech using the pyttsx3 library
+    def speak_fun(self):
+        self.speak_engine.say(self.str)
+        self.speak_engine.runAndWait()
+
+    
+    def clear_fun(self):
+        self.str=" "
+        self.word1 = " "
+        self.word2 = " "
+        self.word3 = " "
+        self.word4 = " "
+
+
+    def predict(self, test_image):
+        # Assign the input image to the 'white' variable
+        white = test_image
+        
+        # Reshape the image to the required shape for the model (batch size, height, width, channels)
+        white = white.reshape(1, 400, 400, 3)
+        
+        # Get the predicted probabilities from the model (array of probabilities for each class)
+        prob = np.array(self.model.predict(white)[0], dtype='float32')
+        
+        # Find the index of the maximum probability (most likely class) and remove it from further consideration
+        ch1 = np.argmax(prob, axis=0)
+        prob[ch1] = 0  # Set the probability of ch1 to 0 to find the next most probable class
+        
+        # Find the next most probable class and remove it from further consideration
+        ch2 = np.argmax(prob, axis=0)
+        prob[ch2] = 0  # Set the probability of ch2 to 0
+        
+        # Find the third most probable class
+
+        ch3 = np.argmax(prob, axis=0)
+        prob[ch3] = 0  # Set the probability of ch3 to 0
+
+        # List of predefined valid combinations of the top two predicted classes
+        pl = [ch1, ch2]
+        
+        # A predefined list of gesture conditions (pairs of classes) that correspond to specific signs
+        l = [[5, 2], [5, 3], [3, 5], [3, 6], [3, 0], [3, 2], [6, 4], [6, 1], [6, 2], [6, 6], 
+            [6, 7], [6, 0], [6, 5], [4, 1], [1, 0], [1, 1], [6, 3], [1, 6], [5, 6], [5, 1], 
+            [4, 5], [1, 4], [1, 5], [2, 0], [2, 6], [4, 6], [1, 0], [5, 7], [1, 6], [6, 1], 
+            [7, 6], [2, 5], [7, 1], [5, 4], [7, 0], [7, 5], [7, 2]]
+        
+        # Check if the combination of ch1 and ch2 exists in the predefined list 'l'
+        if pl in l:
+            # Further refine the prediction based on the relative positions of key points
+            if (self.pts[6][1] < self.pts[8][1] and self.pts[10][1] < self.pts[12][1] and 
+                self.pts[14][1] < self.pts[16][1] and self.pts[18][1] < self.pts[20][1]):
+                # If the points meet the criteria, set ch1 to 'S'
+                ch1 = 0
+
+        # If ch1 is set to 0 (indicating 'S' gesture), then refine further based on other conditions
+        if ch1 == 0:
+            ch1 = 'S'
+            
+            # Check if the x-coordinates of the points indicate an 'A' gesture
+            if self.pts[4][0] < self.pts[6][0] and self.pts[4][0] < self.pts[10][0] and self.pts[4][0] < self.pts[14][0] and self.pts[4][0] < self.pts[18][0]:
+                ch1 = 'A'
+            
+            # Check for 'T' gesture based on x and y coordinates
+            if self.pts[4][0] > self.pts[6][0] and self.pts[4][0] < self.pts[10][0] and self.pts[4][0] < self.pts[14][0] and self.pts[4][0] < self.pts[18][0] and self.pts[4][1] < self.pts[14][1] and self.pts[4][1] < self.pts[18][1]:
+                ch1 = 'T'
+            
+            # Check for 'E' gesture based on y-coordinates
+            if self.pts[4][1] > self.pts[8][1] and self.pts[4][1] > self.pts[12][1] and self.pts[4][1] > self.pts[16][1] and self.pts[4][1] > self.pts[20][1]:
+                ch1 = 'E'
+            
+            # Check for 'M' gesture based on x and y coordinates
+            if self.pts[4][0] > self.pts[6][0] and self.pts[4][0] > self.pts[10][0] and self.pts[4][0] > self.pts[14][0] and self.pts[4][1] < self.pts[18][1]:
+                ch1 = 'M'
+            
+            # Check for 'N' gesture based on x and y coordinates
+            if self.pts[4][0] > self.pts[6][0] and self.pts[4][0] > self.pts[10][0] and self.pts[4][1] < self.pts[18][1] and self.pts[4][1] < self.pts[14][1]:
+                ch1 = 'N'
+
+
+        if ch1 == 2:
+            if self.distance(self.pts[12], self.pts[4]) > 42:
+                ch1 = 'C'
+            else:
+                ch1 = 'O'
+
+        if ch1 == 3:
+            if (self.distance(self.pts[8], self.pts[12])) > 72:
+                ch1 = 'G'
+            else:
+                ch1 = 'H'
+
+        if ch1 == 7:
+            if self.distance(self.pts[8], self.pts[4]) > 42:
+                ch1 = 'Y'
+            else:
+                ch1 = 'J'
+
+        if ch1 == 4:
+            ch1 = 'L'
+
+        if ch1 == 6:
+            ch1 = 'X'
+
+        if ch1 == 5:
+            if self.pts[4][0] > self.pts[12][0] and self.pts[4][0] > self.pts[16][0] and self.pts[4][0] > self.pts[20][0]:
+                if self.pts[8][1] < self.pts[5][1]:
+                    ch1 = 'Z'
+                else:
+                    ch1 = 'Q'
+            else:
+                ch1 = 'P'
+
+        if ch1 == 1:
+            if (self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] > self.pts[16][1] and self.pts[18][1] > self.pts[20][
+                1]):
+                ch1 = 'B'
+            if (self.pts[6][1] > self.pts[8][1] and self.pts[10][1] < self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] < self.pts[20][
+                1]):
+                ch1 = 'D'
+            if (self.pts[6][1] < self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] > self.pts[16][1] and self.pts[18][1] > self.pts[20][
+                1]):
+                ch1 = 'F'
+            if (self.pts[6][1] < self.pts[8][1] and self.pts[10][1] < self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] > self.pts[20][
+                1]):
+                ch1 = 'I'
+            if (self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] > self.pts[16][1] and self.pts[18][1] < self.pts[20][
+                1]):
+                ch1 = 'W'
+            if (self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] < self.pts[20][
+                1]) and self.pts[4][1] < self.pts[9][1]:
+                ch1 = 'K'
+            if ((self.distance(self.pts[8], self.pts[12]) - self.distance(self.pts[6], self.pts[10])) < 8) and (
+                    self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] <
+                    self.pts[20][1]):
+                ch1 = 'U'
+            if ((self.distance(self.pts[8], self.pts[12]) - self.distance(self.pts[6], self.pts[10])) >= 8) and (
+                    self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] <
+                    self.pts[20][1]) and (self.pts[4][1] > self.pts[9][1]):
+                ch1 = 'V'
+
+            if (self.pts[8][0] > self.pts[12][0]) and (
+                    self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] <
+                    self.pts[20][1]):
+                ch1 = 'R'
+
+
+        # for 1 , E , S , X , Y , B check the relative positions
+        if ch1 == 1 or ch1 =='E' or ch1 =='S' or ch1 =='X' or ch1 =='Y' or ch1 =='B':
+            if (self.pts[6][1] > self.pts[8][1] and self.pts[10][1] < self.pts[12][1] and self.pts[14][1] < self.pts[16][1] and self.pts[18][1] > self.pts[20][1]):
+                ch1=" "
+
+
+        # for E , Y , B we mark it as next it corresponds to the open palm like gesture which corresponds to next
+        if ch1 == 'E' or ch1=='Y' or ch1=='B':
+            if (self.pts[4][0] < self.pts[5][0]) and (self.pts[6][1] > self.pts[8][1] and self.pts[10][1] > self.pts[12][1] and self.pts[14][1] > self.pts[16][1] and self.pts[18][1] > self.pts[20][1]):
+                ch1="next"
+
+    #handle next and backspace check that we are in next state prev_char is not next if two steps back we have a backspace then we remove if not then append 
+        if ch1=="next" and self.prev_char!="next":
+            if self.ten_prev_char[(self.count-2)%10]!="next":
+                if self.ten_prev_char[(self.count-2)%10]=="Backspace":
+                    self.str=self.str[0:-1]
+                else:
+                    if self.ten_prev_char[(self.count - 2) % 10] != "Backspace":
+                        self.str = self.str + self.ten_prev_char[(self.count-2)%10]
+            else:
+                if self.ten_prev_char[(self.count - 0) % 10] != "Backspace":
+                    self.str = self.str + self.ten_prev_char[(self.count - 0) % 10]
+
+#adds double space ensuring it is only added once
+        if ch1=="  " and self.prev_char!="  ":
+            self.str = self.str + "  "
+#store the previous characters
+        self.prev_char=ch1
+        self.current_symbol=ch1
+        self.count += 1
+        self.ten_prev_char[self.count%10]=ch1
+
+
+        if len(self.str.strip())!=0:
+            st=self.str.rfind(" ")
+            ed=len(self.str)
+            word=self.str[st+1:ed]
+            self.word=word
+            if len(word.strip())!=0:
+                ddd.check(word)
+                lenn = len(ddd.suggest(word))
+                if lenn >= 4:
+                    self.word4 = ddd.suggest(word)[3]
+
+                if lenn >= 3:
+                    self.word3 = ddd.suggest(word)[2]
+
+                if lenn >= 2:
+                    self.word2 = ddd.suggest(word)[1]
+
+                if lenn >= 1:
+                    self.word1 = ddd.suggest(word)[0]
+            else:
+                self.word1 = " "
+                self.word2 = " "
+                self.word3 = " "
+                self.word4 = " "
+
+
+print("Starting Application...")
+
+(Application()).root.mainloop()
