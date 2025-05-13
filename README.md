@@ -1,6 +1,6 @@
 
 # Sign Language to Text and Speech Conversion 🤟🗣️  
-A real-time system for converting Indian Sign Language gestures into **text and speech**, using **deep learning**, **OpenCV**, and a **custom Tkinter-based GUI**.
+A real-time system for converting American Sign Language gestures into **text and speech**, using **deep learning**, **OpenCV**, and a **custom Tkinter-based GUI**.
 
 [![Demo Video](https://img.shields.io/badge/Watch-Demo-blue)](link-to-video)  
 🔗 **GitHub**: [github.com/jashan7167/SignLanguageDetection](https://github.com/jashan7167/SignLanguageDetection)
@@ -9,7 +9,7 @@ A real-time system for converting Indian Sign Language gestures into **text and 
 
 ## 📌 Features
 
-- 🔤 Converts Indian Sign Language (ISL) alphabet gestures to text
+- 🔤 Converts American Sign Language (ASL) alphabet gestures to text
 - 🗣️ Converts the detected text to speech
 - 📷 Real-time webcam-based gesture capture
 - 🧠 Deep learning model trained on 8 grouped classes
@@ -21,12 +21,9 @@ A real-time system for converting Indian Sign Language gestures into **text and 
 
 ## 📽️ Demonstration
 
-> ⬇️ **Insert a screenshot here showing a gesture being detected**
+[](./Images/a.png)
 
-```
-📸 ![Gesture Recognition Screenshot](link-to-image)
-```
-
+#####  Gesture of  'A' being detected and converted to text
 > ⬇️ **Insert a screenshot here showing a complete word being formed**
 
 ```
