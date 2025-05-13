@@ -125,7 +125,7 @@ Initially developed using **PyQt5**, we shifted to **Tkinter** due to:
 ## 🧪 Testing and Refinement
 
 - **Tested each grouped gesture individually**
-- Added **hardcoded logic** for characters often confused (e.g., M vs. N)
+- Added **hardcoded logic** for characters often confused 
 - Alternative gesture libraries were tried (e.g., MediaPipe, Handtrack.js), but lacked accuracy, so we opted for model + rules
 
 ---
