@@ -20,21 +20,31 @@ A real-time system for converting American Sign Language gestures into **text an
 ---
 
 ## 📽️ Demonstration
+---
+<img src="Images/gui .png" alt="Detected Gesture" width="400"/>
 
-[](./Images/a.png)
+#####  GUI 
+---
+
+<img src="Images/a.png" alt="Detected Gesture" width="400"/>
 
 #####  Gesture of  'A' being detected and converted to text
-> ⬇️ **Insert a screenshot here showing a complete word being formed**
 
-```
-📸 ![Formed Word Screenshot](link-to-image)
-```
+---
+
+<img src="Images/hellowordformation.png" alt="Detected Gesture" width="400"/>
+
+
+#####  "Hello" is converted to text from showing gestures of respective alphabets
+
+
+
+---
+
 
 > ⬇️ **Insert video demonstration link below**
 
-```
-🎥 [Click to watch the demo video](link-to-your-demo)
-```
+
 
 ---
 
