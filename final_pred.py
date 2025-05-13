@@ -19,7 +19,7 @@ offset=29
 class Application:
 
     def __init__(self):
-        self.vs = cv2.VideoCapture(0)
+        self.vs = cv2.VideoCapture(2)
         self.current_image = None
         self.model = load_model('Sign-Language-To-Text-and-Speech-Conversion/cnn8grps_rad1_model.h5')
 
