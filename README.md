@@ -134,11 +134,9 @@ Initially developed using **PyQt5**, we shifted to **Tkinter** due to:
 
 ## 👥 Team
 
-- [Your Name]
-- [Team Members if any]
+- Jashanjot Singh
+- Divyanshu Pandey
+- Himanshu Sharma
 
 ---
 
-## 💡 License
-
-This project is open-source and available under the MIT License.
