@@ -42,10 +42,6 @@ A real-time system for converting American Sign Language gestures into **text an
 ---
 
 
-> ⬇️ **Insert video demonstration link below**
-
-
-
 ---
 
 ## 🧠 Grouped Gesture Model
